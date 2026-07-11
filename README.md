@@ -85,7 +85,8 @@ scripts\build_windows.bat
 | **安装包（推荐）** | `python scripts\build_windows.py --installer` | `dist\SoilFaunaMeasure-Setup-*.exe`（选路径、桌面图标；需 [Inno Setup 6](https://jrsoftware.org/isinfo.php)） |
 
 - 打包流程与产物：[`docs/PACKAGING.md`](docs/PACKAGING.md)  
-- **全新 Win 环境准备（软件 + 全部库）**：[`docs/WINDOWS_PACKAGING_SETUP.md`](docs/WINDOWS_PACKAGING_SETUP.md)
+- **全新 Win 环境准备（软件 + 全部库）**：[`docs/WINDOWS_PACKAGING_SETUP.md`](docs/WINDOWS_PACKAGING_SETUP.md)  
+- **CI 自动编 Windows 版**：GitHub → Actions → **Build Windows**（或推送 `v*` 标签发 Release）
 
 ## 技术栈
 

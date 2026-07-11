@@ -1,0 +1,167 @@
+# 在 GitHub-hosted Windows 上自动打包 土衡 SoilFauna Measure
+#
+# 触发：
+#   - 手动：Actions → Build Windows → Run workflow
+#   - 推送 tag：v0.8.0 等形式会构建并创建 GitHub Release
+#   - 推送到 main（源码/打包脚本变更时）
+#
+# 产物（Artifacts / Release）：
+#   - SoilFaunaMeasure-windows-portable.zip  绿色文件夹版
+#   - SoilFaunaMeasure-Setup-*.exe           安装包（若 Inno Setup 安装成功）
+
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "scripts/**"
+      - "pyproject.toml"
+      - ".github/workflows/build-windows.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "scripts/**"
+      - "pyproject.toml"
+      - ".github/workflows/build-windows.yml"
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows package
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install project + PyInstaller
+        shell: pwsh
+        run: |
+          python -m pip install -U pip setuptools wheel
+          pip install -e ".[packaging]"
+          python -c "import PySide6, numpy, skimage, scipy, tifffile, PIL, openpyxl, PyInstaller; print('deps ok')"
+
+      - name: Read app version
+        id: ver
+        shell: pwsh
+        run: |
+          $raw = Get-Content pyproject.toml -Raw
+          if ($raw -match 'version\s*=\s*"([^"]+)"') {
+            $v = $Matches[1]
+          } else {
+            $v = "0.0.0"
+          }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "App version: $v"
+
+      - name: Build portable (onedir)
+        shell: pwsh
+        run: |
+          python scripts/build_windows.py
+          if (-not (Test-Path "dist\SoilFaunaMeasure\SoilFaunaMeasure.exe")) {
+            throw "Portable build missing dist\SoilFaunaMeasure\SoilFaunaMeasure.exe"
+          }
+          Get-ChildItem dist\SoilFaunaMeasure | Select-Object Name, Length | Format-Table
+
+      - name: Zip portable folder
+        shell: pwsh
+        run: |
+          $zip = "dist\SoilFaunaMeasure-windows-portable.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "dist\SoilFaunaMeasure\*" -DestinationPath $zip -CompressionLevel Optimal
+          Get-Item $zip | Format-List Name, Length, FullName
+
+      - name: Install Inno Setup
+        id: inno
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $iscc)) {
+            throw "ISCC.exe not found after chocolatey install"
+          }
+          Write-Host "ISCC=$iscc"
+          "iscc=$iscc" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Build Setup installer
+        id: installer
+        if: steps.inno.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        env:
+          SFM_ISCC: ${{ steps.inno.outputs.iscc }}
+        run: |
+          python scripts/build_windows.py --installer-only
+          $setup = Get-ChildItem "dist\SoilFaunaMeasure-Setup-*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $setup) {
+            throw "Installer exe not found under dist\"
+          }
+          Write-Host "Setup: $($setup.FullName) ($([math]::Round($setup.Length/1MB,1)) MB)"
+          "setup_path=$($setup.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "setup_name=$($setup.Name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: SoilFaunaMeasure-windows-portable
+          path: dist/SoilFaunaMeasure-windows-portable.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload portable folder (uncompressed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SoilFaunaMeasure-windows-onedir
+          path: dist/SoilFaunaMeasure/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Setup installer
+        if: steps.installer.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SoilFaunaMeasure-windows-setup
+          path: dist/SoilFaunaMeasure-Setup-*.exe
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 土衡 SoilFauna Measure ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          generate_release_notes: true
+          files: |
+            dist/SoilFaunaMeasure-windows-portable.zip
+            dist/SoilFaunaMeasure-Setup-*.exe
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

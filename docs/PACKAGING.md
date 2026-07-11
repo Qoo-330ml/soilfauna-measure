@@ -3,7 +3,10 @@
 目标：生成**自带 Python 运行时**的程序，用户**不需要安装 Python**，解压后双击即可用。
 
 > **全新 Windows、尚未装 Python？** 先看完整准备清单：  
-> [WINDOWS_PACKAGING_SETUP.md](./WINDOWS_PACKAGING_SETUP.md)（系统软件 + 全部库 + 一条龙命令）。
+> [WINDOWS_PACKAGING_SETUP.md](./WINDOWS_PACKAGING_SETUP.md)（系统软件 + 全部库 + 一条龙命令）。  
+>
+> **自动打包：** GitHub Actions 工作流 [`.github/workflows/build-windows.yml`](../.github/workflows/build-windows.yml)  
+> 在 `windows-latest` 上构建绿色版 + Setup（若 Inno 安装成功）。见下文「CI 自动打包」。
 
 支持三种输出：
 
@@ -12,6 +15,32 @@
 | **onedir** | `SoilFaunaMeasure\` 文件夹 = `.exe` + `_internal\` | 绿色版、启动快 |
 | **onefile** | 单个 `SoilFaunaMeasure.exe` | 方便拷贝；首次启动较慢 |
 | **installer（推荐给最终用户）** | `SoilFaunaMeasure-Setup-x.y.z.exe` | 选路径安装、桌面图标；安装后仍是 onedir，启动快 |
+
+---
+
+## 〇、CI 自动打包（GitHub Actions）
+
+仓库已配置工作流：**Build Windows**。
+
+| 触发 | 行为 |
+|------|------|
+| **Actions → Build Windows → Run workflow** | 手动构建 |
+| 推送 **`v*`** 标签（如 `v0.8.0`） | 构建并创建 **GitHub Release**，附带 zip / Setup |
+| 推送到 **main**（改了 `src/`、`scripts/`、`pyproject.toml`） | 构建并上传 Artifact |
+| 对应路径的 **Pull Request** | 构建 Artifact（不发 Release） |
+
+产物在 Actions 运行页的 **Artifacts** 中下载：
+
+- `SoilFaunaMeasure-windows-portable` — 绿色版 zip  
+- `SoilFaunaMeasure-windows-onedir` — 未压缩文件夹  
+- `SoilFaunaMeasure-windows-setup` — 安装包（Inno 步骤成功时）  
+
+打标签发版示例：
+
+```bash
+git tag v0.8.0
+git push origin v0.8.0
+```
 
 ---
 
