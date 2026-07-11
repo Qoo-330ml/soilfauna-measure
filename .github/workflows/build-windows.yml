@@ -2,12 +2,14 @@
 #
 # 触发：
 #   - 手动：Actions → Build Windows → Run workflow
-#   - 推送 tag：v0.8.0 等形式会构建并创建 GitHub Release
-#   - 推送到 main（源码/打包脚本变更时）
+#   - 推送 tag：v0.8.0 → 版本化 Release + 附件
+#   - 推送到 main → 更新 rolling Release「latest」
 #
-# 产物（Artifacts / Release）：
-#   - SoilFaunaMeasure-windows-portable.zip  绿色文件夹版
-#   - SoilFaunaMeasure-Setup-*.exe           安装包（若 Inno Setup 安装成功）
+# 产物会：
+#   1) 上传到 Actions Artifacts
+#   2) 发布到 GitHub Releases（PR 除外）
+#      - 标签 v*  → Release 名称 = 标签
+#      - main / 手动 → Release 标签 = latest（每次覆盖同名附件）
 
 name: Build Windows
 
@@ -126,32 +128,53 @@ jobs:
           "setup_path=$($setup.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "setup_name=$($setup.Name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Upload portable zip
+      - name: Stage release assets
+        id: assets
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.version }}"
+          $sha = "${{ github.sha }}".Substring(0, 7)
+          $out = "dist\release"
+          if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          $portableName = "SoilFaunaMeasure-${ver}-windows-portable.zip"
+          Copy-Item "dist\SoilFaunaMeasure-windows-portable.zip" (Join-Path $out $portableName)
+
+          $setupFiles = @(Get-ChildItem "dist\SoilFaunaMeasure-Setup-*.exe" -ErrorAction SilentlyContinue)
+          $hasSetup = "false"
+          foreach ($f in $setupFiles) {
+            Copy-Item $f.FullName (Join-Path $out $f.Name)
+            $hasSetup = "true"
+          }
+
+          Write-Host "Release assets:"
+          Get-ChildItem $out | Format-Table Name, @{N='MB';E={[math]::Round($_.Length/1MB,1)}}
+
+          "portable_name=$portableName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "has_setup=$hasSetup" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "short_sha=$sha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload portable zip (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: SoilFaunaMeasure-windows-portable
-          path: dist/SoilFaunaMeasure-windows-portable.zip
+          path: dist/release/*.zip
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload portable folder (uncompressed)
-        uses: actions/upload-artifact@v4
-        with:
-          name: SoilFaunaMeasure-windows-onedir
-          path: dist/SoilFaunaMeasure/
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload Setup installer
-        if: steps.installer.outcome == 'success'
+      - name: Upload Setup installer (artifact)
+        if: steps.assets.outputs.has_setup == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: SoilFaunaMeasure-windows-setup
-          path: dist/SoilFaunaMeasure-Setup-*.exe
+          path: dist/release/*.exe
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Publish GitHub Release (tags only)
+      # ---- Releases：PR 不发布；main/手动 → latest；tag v* → 版本 Release ----
+
+      - name: Publish versioned Release (tag v*)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
@@ -159,9 +182,38 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
           generate_release_notes: true
-          files: |
-            dist/SoilFaunaMeasure-windows-portable.zip
-            dist/SoilFaunaMeasure-Setup-*.exe
-          fail_on_unmatched_files: false
+          make_latest: true
+          files: dist/release/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish rolling Release (latest)
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          target_commitish: ${{ github.sha }}
+          name: Latest Windows build (v${{ steps.ver.outputs.version }})
+          body: |
+            自动构建的 Windows 包（滚动更新，每次成功构建会覆盖附件）。
+
+            | 项 | 值 |
+            |----|----|
+            | 版本 (pyproject) | `${{ steps.ver.outputs.version }}` |
+            | 提交 | `${{ github.sha }}` |
+            | 分支/事件 | `${{ github.ref_name }}` / `${{ github.event_name }}` |
+            | 工作流 | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+
+            ### 下载说明
+            - **`-windows-portable.zip`**：绿色版，解压后运行 `SoilFaunaMeasure.exe`（勿删 `_internal`）
+            - **`SoilFaunaMeasure-Setup-*.exe`**：安装包（可选路径、桌面图标；若本次构建有生成）
+
+            正式版本请使用带 `v*` 标签的 [Releases](../releases)。
+          draft: false
+          prerelease: true
+          make_latest: false
+          files: dist/release/*
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

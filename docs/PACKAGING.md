@@ -22,26 +22,30 @@
 
 仓库已配置工作流：**Build Windows**。
 
-| 触发 | 行为 |
-|------|------|
-| **Actions → Build Windows → Run workflow** | 手动构建 |
-| 推送 **`v*`** 标签（如 `v0.8.0`） | 构建并创建 **GitHub Release**，附带 zip / Setup |
-| 推送到 **main**（改了 `src/`、`scripts/`、`pyproject.toml`） | 构建并上传 Artifact |
-| 对应路径的 **Pull Request** | 构建 Artifact（不发 Release） |
+| 触发 | Artifacts | GitHub Releases |
+|------|-----------|-----------------|
+| **Actions → Build Windows → Run workflow** | 有 | 更新 **`latest`** 滚动版 |
+| 推送 **`v*`** 标签（如 `v0.8.0`） | 有 | 创建 **正式 Release**（该标签） |
+| 推送到 **main**（改了源码/打包脚本） | 有 | 更新 **`latest`** 滚动版 |
+| 对应路径的 **Pull Request** | 有 | 不发布 |
 
-产物在 Actions 运行页的 **Artifacts** 中下载：
+下载地址（构建成功后）：
 
-- `SoilFaunaMeasure-windows-portable` — 绿色版 zip  
-- `SoilFaunaMeasure-windows-onedir` — 未压缩文件夹  
-- `SoilFaunaMeasure-windows-setup` — 安装包（Inno 步骤成功时）  
+- 滚动最新：https://github.com/Qoo-330ml/soilfauna-measure/releases/tag/latest  
+- 全部发版：https://github.com/Qoo-330ml/soilfauna-measure/releases  
+- 单次构建临时包：Actions 运行页 → Artifacts  
 
-打标签发版示例：
+附件文件名示例：
+
+- `SoilFaunaMeasure-0.8.0-windows-portable.zip`  
+- `SoilFaunaMeasure-Setup-0.8.0.exe`  
+
+打正式版标签：
 
 ```bash
 git tag v0.8.0
 git push origin v0.8.0
 ```
-
 ---
 
 ## 一、重要限制

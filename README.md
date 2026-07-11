@@ -86,7 +86,8 @@ scripts\build_windows.bat
 
 - 打包流程与产物：[`docs/PACKAGING.md`](docs/PACKAGING.md)  
 - **全新 Win 环境准备（软件 + 全部库）**：[`docs/WINDOWS_PACKAGING_SETUP.md`](docs/WINDOWS_PACKAGING_SETUP.md)  
-- **CI 自动编 Windows 版**：GitHub → Actions → **Build Windows**（或推送 `v*` 标签发 Release）
+- **CI 自动编 Windows 版**：GitHub → Actions → **Build Windows**  
+  - 产物发到 [Releases](https://github.com/Qoo-330ml/soilfauna-measure/releases)（`main`/手动 → `latest`；打 `v*` 标签 → 正式版）
 
 ## 技术栈
 
