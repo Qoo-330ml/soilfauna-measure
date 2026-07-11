@@ -20,11 +20,46 @@ from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all
 
-ROOT = Path(SPECPATH).resolve().parent.parent  # scripts/ -> repo root
+# SPECPATH is the *directory* containing this .spec (PyInstaller docs),
+# not the path to the .spec file. Older notes sometimes treated it as a file.
+# Resolve repo root robustly so CI and local builds both work.
+
+
+def _repo_root() -> Path:
+    here = Path(SPECPATH).resolve()
+    candidates = []
+    if here.is_file() or here.suffix.lower() == ".spec":
+        # path/to/repo/scripts/Foo.spec
+        candidates.append(here.parent.parent)
+        candidates.append(here.parent)
+    else:
+        # path/to/repo/scripts  (normal SPECPATH)
+        candidates.append(here.parent)
+        candidates.append(here)
+        candidates.append(here.parent.parent)
+    # Also try cwd (build_windows.py runs pyinstaller with cwd=repo root)
+    try:
+        candidates.append(Path.cwd().resolve())
+    except Exception:
+        pass
+    for root in candidates:
+        entry = root / "src" / "soilfauna_measure" / "main.py"
+        if entry.is_file():
+            return root
+    raise SystemExit(
+        "Cannot locate repo root from SPECPATH=%r cwd=%r; "
+        "expected src/soilfauna_measure/main.py"
+        % (SPECPATH, Path.cwd())
+    )
+
+
+ROOT = _repo_root()
 SRC = ROOT / "src"
 ICONS = SRC / "soilfauna_measure" / "resources" / "icons"
 ENTRY = SRC / "soilfauna_measure" / "main.py"
 NAME = "SoilFaunaMeasure"
+print("PyInstaller ROOT =", ROOT)
+print("PyInstaller ENTRY =", ENTRY)
 
 # onefile when SFM_ONEFILE=1 (set by build_windows.py --onefile)
 ONEFILE = os.environ.get("SFM_ONEFILE", "0").strip() in ("1", "true", "True", "yes")
