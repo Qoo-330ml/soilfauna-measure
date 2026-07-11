@@ -3,7 +3,7 @@
 土壤动物图像分割与形态测量系统（离线桌面应用）。
 
 **英文名**：SoilFauna Measure  
-**仓库**：`soilfauna-measure`
+**仓库**：https://github.com/Qoo-330ml/soilfauna-measure
 
 ## 当前进度
 
