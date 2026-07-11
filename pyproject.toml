@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soilfauna-measure"
+version = "0.8.0"
+description = "土衡 / SoilFauna Measure — 土壤动物图像分割与形态测量系统"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "SoilFauna Measure Contributors" }]
+keywords = ["soil-fauna", "image-measurement", "scientific", "desktop"]
+dependencies = [
+    # Widgets desktop UI only — Essentials skips Addons (WebEngine/3D/Multimedia…).
+    # Import path stays `from PySide6.QtWidgets import …` (same as full PySide6).
+    "PySide6_Essentials>=6.6",
+    "numpy>=1.24",
+    "tifffile>=2023.1.0",
+    "Pillow>=10.0",
+    "scikit-image>=0.22",
+    "scipy>=1.11",  # required by scikit-image; also used for distance_transform
+    "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-qt>=4.2",
+]
+full = [
+    "opencv-python-headless>=4.8",
+]
+packaging = [
+    "pyinstaller>=6.0",
+]
+
+[project.scripts]
+soilfauna-measure = "soilfauna_measure.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+soilfauna_measure = [
+    "resources/icons/*.png",
+    "resources/icons/*.jpg",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.env
+.python-version
+
+# Testing / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# App runtime / local workspaces
+**/workspace/
+**/autosave/
+*.sfm.json.bak
+_analysis/
+
+# Packaging
+build_output/
+# Keep scripts/SoilFaunaMeasure.spec in repo (needed for Windows builds)
+
+# Large local samples (keep examples/HJ98 if committed deliberately)
+# examples/*.tif
